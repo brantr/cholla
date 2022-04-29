@@ -52,6 +52,16 @@ void Particles_3D::Initialize( struct parameters *P, Grav3D &Grav,  Real xbound,
   n_local = 0;
   n_total = 0;
   n_total_initial = 0;
+  
+  #ifdef PARTICLES_OFFLOAD_CPU
+  n_offloaded = 0;
+  gpu_max_memory_fraction = 0.8;
+  size_t global_free, global_total;
+  CudaSafeCall( cudaMemGetInfo( &global_free, &global_total ) );
+  // Compute the max number of particles based on the free global memory and the gpu_max_memory_fraction  
+  n_max_in_gpu = ( part_int_t ) global_free * gpu_max_memory_fraction / sizeof( Real ) / N_DATA_PER_PARTICLE_TRANSFER;
+  chprintf( " Max number of particles in GPU %ld which uses %f GB out of %f GB Available. \n", n_max_in_gpu, global_free * gpu_max_memory_fraction/1e9, global_free/1e9 ); 
+  #endif
 
   //Initialize the simulation time and delta_t to 0
   dt = 0.0;
@@ -257,14 +267,15 @@ void Particles_3D::Allocate_Memory( void ){
   //Allocate arrays for density and gravitational field
 
   G.density   = (Real *) malloc(G.n_cells*sizeof(Real));
-  #ifdef PARTICLES_CPU
+  #if defined(PARTICLES_CPU) || defined(PARTICLES_OFFLOAD_CPU)
   G.gravity_x = (Real *) malloc(G.n_cells*sizeof(Real));
   G.gravity_y = (Real *) malloc(G.n_cells*sizeof(Real));
   G.gravity_z = (Real *) malloc(G.n_cells*sizeof(Real));
-  #ifdef GRAVITY_GPU
+  #endif
+  
+  #if defined(PARTICLES_CPU) && defined(GRAVITY_GPU)
   // Array to copy the particles density to the device for computing the potential in the device
   Allocate_Particles_Grid_Field_Real( &G.density_dev, G.n_cells);
-  #endif
   #endif
 
   #ifdef PARTICLES_GPU
@@ -443,30 +454,30 @@ void Particles_3D::Initialize_Grid_Values( void ){
 }
 
 void Particles_3D::Initialize_Sphere(struct parameters *P){
-
+  
   //Initialize Random positions for sphere of quasi-uniform density
   chprintf( " Initializing Particles Uniform Sphere\n");
-
+  
   int i, j, k, id;
   Real center_x, center_y, center_z, radius, sphereR;
   center_x = 0.5;
   center_y = 0.5;
   center_z = 0.5;;
   sphereR = 0.2;
-
+  
   //Set the number of particles equal to the number of grid cells
   part_int_t n_particles_local = G.nx_local*G.ny_local*G.nz_local;
   part_int_t n_particles_total = G.nx_total*G.ny_total*G.nz_total;
-
+  
   //Set the initial density for the particles
   Real rho_start = 1;
   Real M_sphere = 4./3 * M_PI* rho_start * sphereR*sphereR*sphereR;
   Real Mparticle = M_sphere / n_particles_total;
-
+  
   #ifdef SINGLE_PARTICLE_MASS
   particle_mass = Mparticle;
   #endif
-
+  
   #ifdef PARTICLES_GPU
   // Alocate memory in GPU for particle data
   particles_array_size = Compute_Particles_GPU_Array_Size( n_particles_local );
@@ -483,7 +494,7 @@ void Particles_3D::Initialize_Sphere(struct parameters *P){
   Allocate_Particles_GPU_Array_Real( &mass_dev, particles_array_size);
   #endif
   n_local = n_particles_local;
-
+  
   //Allocate temporal Host arrays for the particles data
   Real *temp_pos_x  = (Real *) malloc(particles_array_size*sizeof(Real));
   Real *temp_pos_y  = (Real *) malloc(particles_array_size*sizeof(Real));
@@ -494,13 +505,13 @@ void Particles_3D::Initialize_Sphere(struct parameters *P){
   #ifndef SINGLE_PARTICLE_MASS
   Real *temp_mass   = (Real *) malloc(particles_array_size*sizeof(Real));
   #endif
-
+  
   chprintf( " Allocated GPU memory for particle data\n");
   #endif //PARTICLES_GPU
-
-
+  
+  
   chprintf( " Initializing Random Positions\n");
-
+  
   part_int_t pID = 0;
   Real pPos_x, pPos_y, pPos_z, r;
   ChollaPrngGenerator prng(P);
@@ -511,10 +522,10 @@ void Particles_3D::Initialize_Sphere(struct parameters *P){
     pPos_x = xPositionPrng(prng.generator);
     pPos_y = yPositionPrng(prng.generator);
     pPos_z = zPositionPrng(prng.generator);
-
+  
     r = sqrt( (pPos_x-center_x)*(pPos_x-center_x) + (pPos_y-center_y)*(pPos_y-center_y) + (pPos_z-center_z)*(pPos_z-center_z) );
     if ( r > sphereR ) continue;
-
+  
     #ifdef PARTICLES_CPU
     //Copy the particle data to the particles vectors
     pos_x.push_back( pPos_x );
@@ -533,7 +544,7 @@ void Particles_3D::Initialize_Sphere(struct parameters *P){
     mass.push_back( Mparticle );
     #endif
     #endif //PARTICLES_CPU
-
+  
     #ifdef PARTICLES_GPU
     // Copy the particle data to the temporal Host Buffers
     temp_pos_x[pID]  = pPos_x;
@@ -546,14 +557,14 @@ void Particles_3D::Initialize_Sphere(struct parameters *P){
     temp_mass[pID]  = Mparticle;
     #endif
     #endif //PARTICLES_GPU
-
+  
     pID += 1;
   }
-
+  
   #ifdef PARTICLES_CPU
   n_local = pos_x.size();
   #endif //PARTICLES_CPU
-
+  
   #if defined(PARTICLE_IDS) && defined(MPI_CHOLLA)
   // Get global IDs: Offset the local IDs to get unique global IDs across the MPI ranks
   chprintf( " Computing Global Particles IDs offset \n" );
@@ -568,7 +579,7 @@ void Particles_3D::Initialize_Sphere(struct parameters *P){
   //Particles IDs not implemented for PARTICLES_GPU yet
   #endif//PARTICLES_GPU
   #endif//PARTICLE_IDS and MPI_CHOLLA
-
+  
   #ifdef PARTICLES_GPU
   //Copyt the particle data from tepmpotal Host buffer to GPU memory
   Copy_Particles_Array_Real_Host_to_Device( temp_pos_x, pos_x_dev, n_local);
@@ -580,7 +591,7 @@ void Particles_3D::Initialize_Sphere(struct parameters *P){
   #ifndef SINGLE_PARTICLE_MASS
   Copy_Particles_Array_Real_Host_to_Device( temp_mass, mass_dev, n_local);
   #endif
-
+  
   //Free the temporal host buffers
   free( temp_pos_x );
   free( temp_pos_y );
@@ -592,7 +603,7 @@ void Particles_3D::Initialize_Sphere(struct parameters *P){
   free( temp_mass );
   #endif
   #endif //PARTICLES_GPU
-
+  
   chprintf( " Particles Uniform Sphere Initialized, n_local: %lu\n", n_local);
 
 }
@@ -611,21 +622,21 @@ void Particles_3D::Initialize_Disk_Stellar_Clusters(struct parameters *P) {
       chexit(-1);
   #endif
   chprintf( " Initializing Particles Stellar Disk\n");
-
+  
   // Set up the PRNG
   ChollaPrngGenerator prng(P);
-
+  
   std::gamma_distribution<Real> radialDist(2,1);           //for generating cyclindrical radii
   std::uniform_real_distribution<Real> zDist(0, 1);        //for generating height above/below the disk.
   std::uniform_real_distribution<Real> phiDist(0, 2*M_PI); //for generating phi
   std::normal_distribution<Real> speedDist(0, 1);          //for generating random speeds.
-
+  
   Real M_d = Galaxies::MW.getM_d(); // MW disk mass in M_sun (assumed to be all in stars)
   Real R_d = Galaxies::MW.getR_d(); // MW stellar disk scale length in kpc
   Real Z_d = Galaxies::MW.getZ_d(); // MW stellar height scale length in kpc
   Real R_max = sqrt(P->xlen*P->xlen + P->ylen*P->ylen)/2;
   R_max = P->xlen / 2.0;
-
+  
   Real x, y, z, R, phi;
   Real vx, vy, vz, vel, ac;
   Real expFactor, vR_rms, vR, vPhi_str, vPhi, v_c2, vPhi_rand_rms, kappa2;
@@ -640,23 +651,23 @@ void Particles_3D::Initialize_Disk_Stellar_Clusters(struct parameters *P) {
       do {
           R = R_d*radialDist(prng.generator);
       } while (R > R_max);
-
+  
       phi = phiDist(prng.generator);
       x = R * cos(phi);
       y = R * sin(phi);
       z = 0;
-
+  
       if (x < G.xMin || x > G.xMax) continue;
       if (y < G.yMin || y > G.yMax) continue;
       if (z < G.zMin || z > G.zMax) continue;
-
+  
       ac  = fabs(Galaxies::MW.gr_disk_D3D(R, 0) + Galaxies::MW.gr_halo_D3D(R, 0));
       vPhi = sqrt(R*ac);
-
+  
       vx =  -vPhi*sin(phi);
       vy =  vPhi*cos(phi);
       vz = 0;
-
+  
       #ifdef PARTICLES_CPU
       //Copy the particle data to the particles vectors
       pos_x.push_back(x);
@@ -668,7 +679,7 @@ void Particles_3D::Initialize_Disk_Stellar_Clusters(struct parameters *P) {
       grav_x.push_back(0.0);
       grav_y.push_back(0.0);
       grav_z.push_back(0.0);
-
+  
       #ifdef PARTICLE_IDS
       id =  i;
       #ifdef PARALLEL_OMP
@@ -679,22 +690,22 @@ void Particles_3D::Initialize_Disk_Stellar_Clusters(struct parameters *P) {
       #endif //PARALLEL_OMP
       partIDs.push_back(id);
       #endif //PARTICLE_IDS
-
+  
       #ifdef PARTICLE_AGE
       //if (fabs(z) >= Z_d) age.push_back(1.1e4);
       //else age.push_back(0.0);
       age.push_back(0.0);
       #endif
-
+  
       #endif//PARTICLES_CPU
   }
-
-
-
+  
+  
+  
   #ifdef PARTICLES_CPU
   n_local = pos_x.size();
   #endif
-
+  
   #if defined(PARTICLE_IDS) && defined(MPI_CHOLLA)
   // Get global IDs: Offset the local IDs to get unique global IDs across the MPI ranks
   chprintf( " Computing Global Particles IDs offset \n" );
@@ -709,7 +720,7 @@ void Particles_3D::Initialize_Disk_Stellar_Clusters(struct parameters *P) {
   //Particles IDs not implemented for PARTICLES_GPU yet
   #endif//PARTICLES_GPU
   #endif//PARTICLE_IDS and MPI_CHOLLA
-
+  
   if (lost_particles > 0) chprintf("  lost %lu particles\n", lost_particles);
   chprintf( " Stellar Disk Particles Initialized, n_local: %lu\n", n_local);
 }

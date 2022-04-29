@@ -29,6 +29,12 @@ class Particles_3D
 
   part_int_t n_total;
   part_int_t n_total_initial;
+  
+  #ifdef PARTICLES_OFFLOAD_CPU
+  part_int_t n_offloaded;
+  part_int_t n_max_in_gpu;
+  Real gpu_max_memory_fraction;  
+  #endif  
 
   Real dt;
   Real t;
@@ -46,7 +52,6 @@ class Particles_3D
   #endif
 
 
-  #ifdef PARTICLES_CPU
   #ifdef PARTICLE_IDS
   int_vector_t partIDs;
   #endif
@@ -65,7 +70,7 @@ class Particles_3D
   real_vector_t grav_x;
   real_vector_t grav_y;
   real_vector_t grav_z;
-  #endif //PARTICLES_CPU
+  #endif //PARTICLES_CPU or PARTICLES_OFFLOAD_CPU
 
   #ifdef PARTICLES_GPU
   part_int_t particles_array_size;
@@ -118,14 +123,14 @@ class Particles_3D
   part_int_t n_in_buffer_z1;
 
 
-  #ifdef PARTICLES_CPU
+  #if def(PARTICLES_CPU) || defined(PARTICLES_OFFLOAD_CPU) 
   int_vector_t out_indxs_vec_x0;
   int_vector_t out_indxs_vec_x1;
   int_vector_t out_indxs_vec_y0;
   int_vector_t out_indxs_vec_y1;
   int_vector_t out_indxs_vec_z0;
   int_vector_t out_indxs_vec_z1;
-  #endif //PARTICLES_CPU
+  #endif //PARTICLES_CPU or PARTICLES_OFFLOAD_CPU
 
 
   #endif //MPI_CHOLLA
@@ -161,13 +166,14 @@ class Particles_3D
     #endif
 
     Real *density;
-    #ifdef PARTICLES_CPU
+    #if defined(PARTICLES_CPU) || defined(PARTICLES_OFFLOAD_CPU)
     Real *gravity_x;
     Real *gravity_y;
     Real *gravity_z;
-    #ifdef GRAVITY_GPU
+    #endif //PARTICLES_CPU or PARTICLES_OFFLOAD_CPU
+    
+    #if defined(PARTICLES_CPU) && defined( GRAVITY_GPU )
     Real *density_dev;
-    #endif
     #endif
     
 
