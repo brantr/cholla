@@ -52,6 +52,7 @@ class Particles_3D
   #endif
 
 
+  #if defined(PARTICLES_CPU) || defined(PARTICLES_OFFLOAD_CPU)
   #ifdef PARTICLE_IDS
   int_vector_t partIDs;
   #endif
