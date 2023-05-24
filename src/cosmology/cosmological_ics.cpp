@@ -154,7 +154,7 @@ void Grid3D::Generate_Cosmological_Initial_Conditions( struct parameters *P  ){
   
   Real dens_dm_mean;   
   #ifdef ONLY_PARTICLES
-  dens_dm_mean = 3*Cosmo.H0*Cosmo.H0 / ( 8*M_PI*Cosmo.cosmo_G ) * Cosmo.Omega_M /Cosmo.cosmo_h/Cosmo.cosmo_h *;
+  dens_dm_mean = 3*Cosmo.H0*Cosmo.H0 / ( 8*M_PI*Cosmo.cosmo_G ) * Cosmo.Omega_M /Cosmo.cosmo_h/Cosmo.cosmo_h;
   #else
   dens_dm_mean = 3*Cosmo.H0*Cosmo.H0 / ( 8*M_PI*Cosmo.cosmo_G ) * ( Cosmo.Omega_M - Cosmo.Omega_b ) /Cosmo.cosmo_h/Cosmo.cosmo_h;
   #endif
@@ -399,12 +399,15 @@ void Grid3D::Generate_Cosmological_Initial_Conditions( struct parameters *P  ){
   free( velocities_x );
   free( velocities_y );
   free( velocities_z );
+
+  #ifndef ONLY_PARTICLES
   free( density );
   free( momentum_x );
   free( momentum_y );
   free( momentum_z );
   free( Energy );
   free( GasEnergy ); 
+  #endif
   
   Cosmo.ICs.FFT.Reset();
   chprintf( "Cosmological initial conditions generated successfully. \n\n" );
