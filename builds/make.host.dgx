@@ -1,0 +1,30 @@
+#-- make.inc for the Shamrock Server 
+
+#-- Compiler and flags for different build type
+CC                = /home/bvillasen/util/ompi_gcc_cuda/bin/mpicc
+CXX               = /home/bvillasen/util/ompi_gcc_cuda/bin/mpicxx
+CFLAGS_DEBUG      = -g -O0
+CFLAGS_OPTIMIZE   = -g -O2
+CXXFLAGS_DEBUG    = -g -O0 -std=c++11 
+CXXFLAGS_OPTIMIZE = -Ofast -std=c++11 
+GPUFLAGS         = -std=c++11 
+
+
+OMP_NUM_THREADS = 1
+
+#-- Library
+CUDA_ROOT    = /usr/local/cuda-12.0
+HDF5_ROOT    = /home/bvillasen/util/hdf5/1.12.2
+MPI_ROOT     = /home/bvillasen/util/ompi_gcc_cuda
+FFTW_ROOT    = 
+PFFT_ROOT    = 
+GRACKLE_ROOT = 
+
+#-- Use GPU-aware MPI
+MPI_GPU      = -DMPI_GPU
+
+#-- CUDA Compute capability
+CHOLLA_ARCH  = sm_80
+
+
+
