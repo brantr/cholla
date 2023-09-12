@@ -10,8 +10,8 @@ CFLAGS_OPTIMIZE   = -g -O2
 CXXFLAGS_DEBUG    = -g -O0 -std=c++11
 CXXFLAGS_OPTIMIZE = -Ofast -std=c++11
 
-GPUFLAGS          = --offload-arch=gfx940 -fPIE -munsafe-fp-atomics
-HIPCONFIG	  = -D__HIP_PLATFORM_HCC__= -D__HIP_PLATFORM_AMD__= -I/opt/rocm-5.7.0-1330/include -I/opt/rocm-5.7.0-1330/llvm/bin/../lib/clang/17.0.0
+GPUFLAGS          = -std=c++17 --offload-arch=gfx940 -Wall -Wno-unused-result -munsafe-fp-atomics
+HIPCONFIG	  =  -D__HIP_PLATFORM_HCC__= -D__HIP_PLATFORM_AMD__= -I/opt/rocm-5.7.0-1442/include -I/opt/rocm-5.7.0-1442/llvm/lib/clang/17.0.0
 
 #-- Library
 MPI_ROOT          = ${OMPI_DIR}
