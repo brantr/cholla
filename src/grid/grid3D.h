@@ -642,6 +642,8 @@ class Grid3D
 
     void Zeldovich_Pancake( struct parameters P );
 
+    void Adiabatic_Expansion( struct parameters P );
+
     void Chemistry_Test( struct parameters P );
 
 

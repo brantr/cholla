@@ -306,6 +306,10 @@ part_int_t Select_Particles_to_Transfer_GPU_function( part_int_t n_local, int si
   // Initialize the number of tranfer particles
   n_transfer_h[0] = 0;
 
+  if (n_local == 0) {
+    return 0;
+  }
+
   hipLaunchKernelGGL( Get_Transfer_Flags_Kernel, dim1dGrid, dim1dBlock, 0, 0,  n_local, side, domainMin, domainMax, pos_d, transfer_flags_d);
   CudaCheckError();
 

@@ -83,6 +83,8 @@ void Grid3D::Set_Initial_Conditions(parameters P) {
     Uniform_Grid();
   } else if (strcmp(P.init, "Zeldovich_Pancake")==0) {
     Zeldovich_Pancake(P);
+  } else if (strcmp(P.init, "Adiabatic_Expansion")==0) {
+    Adiabatic_Expansion(P);
   } else if (strcmp(P.init, "Chemistry_Test")==0) {
     Chemistry_Test(P);
   } else if (strcmp(P.init, "Generate_Cosmological_ICs")==0) {
@@ -1508,6 +1510,87 @@ void Grid3D::Zeldovich_Pancake( struct parameters P ){
   #endif //COSMOLOGY
 
 }
+
+void Grid3D::Adiabatic_Expansion(struct parameters P)
+{
+#ifndef COSMOLOGY
+  chprintf("To run an Adiabatic Expansion test, COSMOLOGY has to be turned ON \n");
+  exit(-1);
+#else
+
+  int i, j, k, id;
+  Real x_pos, y_pos, z_pos;
+  Real H0, h, Omega_M, rho_0, G, z_zeldovich, z_init, x_center, T_init, k_x;
+
+  chprintf("Setting Adiabatic Expansion initial conditions...\n");
+  H0      = P.H0;
+  h       = H0 / 100;
+  Omega_M = P.Omega_M;
+
+  chprintf(" h = %f \n", h);
+  chprintf(" Omega_M = %f \n", Omega_M);
+
+  H0 /= 1000;  //[km/s / kpc]
+  G           = G_COSMO;
+  rho_0       = 3 * H0 * H0 / (8 * M_PI * G) * Omega_M / h / h;
+  z_zeldovich = 1;
+  z_init      = P.Init_redshift;
+  chprintf(" rho_0 = %f \n", rho_0);
+  chprintf(" z_init = %f \n", z_init);
+
+  x_center = H.xdglobal / 2;
+
+  T_init = 100;
+  chprintf(" T initial = %f \n", T_init);
+
+  k_x = 2 * M_PI / H.xdglobal;
+
+  Real dens, vel, temp, U, E, gamma;
+  gamma = P.gamma;
+
+  int index;
+  // set the initial values of the conserved variables
+  for (k = H.n_ghost; k < H.nz - H.n_ghost; k++) {
+    for (j = H.n_ghost; j < H.ny - H.n_ghost; j++) {
+      for (i = H.n_ghost; i < H.nx - H.n_ghost; i++) {
+        id = i + j * H.nx + k * H.nx * H.ny;
+
+        // // get the centered cell positions at (i,j,k)
+        Get_Position(i, j, k, &x_pos, &y_pos, &z_pos);
+
+        // Analytical Initial Conditions
+        //  dens = rho_0 / ( 1 - ( 1 + z_zeldovich ) / ( 1 + z_init ) * cos(
+        //  k_x*( x_pos - x_center )) ); vel = - H0 * ( 1 + z_zeldovich ) /
+        //  sqrt( 1 + z_init ) * sin( k_x*( x_pos - x_center )) / k_x; temp =
+        //  T_init * pow( dens / rho_0, 2./3 ); U = temp / (gamma - 1) / MP * KB
+        //  * 1e-10 * dens; E = 0.5 * dens * vel * vel + U;
+
+        dens = rho_0;
+        U    = T_init/(gamma-1)/MP * KB * 1e-10 * rho_0;
+        vel = - H0 * ( 1 + z_zeldovich ) /  sqrt( 1 + z_init ) * sin( k_x*( x_pos - x_center )) / k_x;
+        vel += - H0 * ( 1 + z_zeldovich ) /  sqrt( 1 + z_init ) / k_x; // Constant velocity
+        //vel = - H0 * ( 1 + z_zeldovich ) /  sqrt( 1 + z_init ) / k_x; // Constant velocity
+        vel  = 0;
+
+        E    = 0.5*dens*vel*vel + U;
+
+        // chprintf( "%f \n", vel );
+        C.density[id]    = dens;
+        C.momentum_x[id] = dens * vel;
+        C.momentum_y[id] = 0;
+        C.momentum_z[id] = 0;
+        C.Energy[id]     = E;
+
+  #ifdef DE
+        C.GasEnergy[id] = U;
+  #endif
+      }
+    }
+  }
+
+#endif  // COSMOLOGY
+}
+
 
 
 
